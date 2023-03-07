@@ -1,5 +1,8 @@
 [package]
 name = "relaunch"
+description = "Relaunch is a crate for bundling and relaunching macOS applications, in order to access OS features that are only available to app bundles and not command-line applications."
+homepage = "https://github.com/maaku/relaunch"
+repository = "https://github.com/maaku/relaunch"
 version = "0.1.0"
 authors = ["Mark Friedenach <mark@friedenbach.org>"]
 edition = "2021"
