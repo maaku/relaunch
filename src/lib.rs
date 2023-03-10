@@ -105,9 +105,13 @@ impl Trampoline {
         Self::get_bundle().is_some()
     }
 
-    pub fn bundle(self, location: InstallDir) -> Result<Application, IOError> {
+    pub fn bundle(&self, location: InstallDir) -> Result<Application, IOError> {
         if let Some(bundle) = Self::get_bundle() {
-            return Ok(Application::new(self.name, self.ident, bundle));
+            return Ok(Application::new(
+                self.name.clone(),
+                self.ident.clone(),
+                bundle,
+            ));
         }
 
         let install_path = match location {

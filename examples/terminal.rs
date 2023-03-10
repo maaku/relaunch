@@ -9,6 +9,7 @@ use std::io::Write;
 
 fn main() {
     let _ = match relaunch::Trampoline::new("re-Terminal", "com.github.maaku.relauncher.Terminal")
+        .version("1.0.0")
         .bundle(relaunch::InstallDir::Temp)
     {
         Err(error) => {
