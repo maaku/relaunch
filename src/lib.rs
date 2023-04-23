@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 extern crate objc;
 use objc::runtime::Object;
 
+#[cfg(target_os = "macos")]
 #[link(name = "Foundation", kind = "framework")] // For NSBundle
 #[link(name = "AppKit", kind = "framework")] // For NSApplication
 extern "C" {}
