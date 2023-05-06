@@ -15,6 +15,13 @@ use std::path::{Path, PathBuf};
 extern crate objc;
 use objc::runtime::Object;
 
+// The relaunch crate is only needed on the macOS platform, but gating
+// dependencies by build configuration is not something that comes naturally
+// to Cargo.  So we want to allow the crate to be built on other platforms,
+// but only link to the necessary Cocoa frameworks on macOS.
+//
+// The caller is required to gate the use of the relaunch crate by platform,
+// otherwise runtime errors will be encountered.
 #[cfg(target_os = "macos")]
 #[link(name = "Foundation", kind = "framework")] // For NSBundle
 #[link(name = "AppKit", kind = "framework")] // For NSApplication
