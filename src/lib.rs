@@ -62,6 +62,9 @@ impl Trampoline {
         Trampoline {
             name: name.to_string(),
             ident: ident.to_string(),
+            // FIXME: This defaults to the relaunch crate version, not the
+            //        version of the binary being built.  This is almost
+            //        certainly not what the user wants.
             version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
