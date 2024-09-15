@@ -5,8 +5,17 @@
 
 extern crate relaunch;
 
+use winit::{
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+};
+
 fn main() {
-    let _ = match relaunch::Trampoline::new("re-winit", "com.github.maaku.relauncher.winit")
+    // First create the winit event loop.  This *must* come before calling out to relaunch.
+    let event_loop = EventLoop::new().expect("Failed to create event loop");
+
+    // Re-launch the application as a bundled application.
+    match relaunch::Trampoline::new("re-winit", "com.github.maaku.relauncher.winit")
         .bundle(relaunch::InstallDir::Temp)
     {
         Err(error) => {
@@ -19,37 +28,43 @@ fn main() {
                 "Application relaunched successfully from {}",
                 app.bundle_path.to_str().unwrap()
             );
-            app
         }
     };
 
     // We are now running as a bundled application.
     assert!(relaunch::Trampoline::is_bundled());
 
-    let event_loop = winit::event_loop::EventLoop::new();
+    // Create the window.
     let window = winit::window::WindowBuilder::new()
         .with_title("re-winit")
         .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
         .expect("Failed to create window");
-    event_loop.run(move |event, _, control_flow| {
+
+    // Run the event loop.
+    if let Err(err) = event_loop.run(move |event, window_target| {
         // ControlFlow::Wait pauses the event loop if no events are available
         // to process.  So long as the contents of the window are not changing,
         // we only need to redraw after processing all events.
-        *control_flow = winit::event_loop::ControlFlow::Wait;
+        window_target.set_control_flow(ControlFlow::Wait);
 
         #[allow(clippy::collapsible_match, clippy::single_match)]
         match event {
-            winit::event::Event::WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::CloseRequested => {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::RedrawRequested => {
+                    // Redraw the application.
+                    //...
+                }
+
+                WindowEvent::CloseRequested => {
                     // Terminate the application.
-                    *control_flow = winit::event_loop::ControlFlow::ExitWithCode(0);
+                    window_target.exit();
                 }
 
                 // Ignore all other `WindowEvent`'s.
                 _ => (),
             },
-            winit::event::Event::MainEventsCleared => {
+            Event::AboutToWait => {
                 // Application update code
                 let redraw_required = false;
                 //...
@@ -60,13 +75,11 @@ fn main() {
                     window.request_redraw();
                 }
             }
-            winit::event::Event::RedrawRequested(_) => {
-                // Redraw the application.
-                //...
-            }
             _ => (),
         }
-    });
+    }) {
+        eprintln!("Event loop terminated with error: {}", err);
+    };
 }
 
 // End of File

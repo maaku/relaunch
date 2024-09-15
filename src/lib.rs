@@ -94,6 +94,49 @@ impl Trampoline {
     pub fn bundle(&self, location: InstallDir) -> Result<Application, IOError> {
         platform_impl::bundle(self, location)
     }
+
+    #[cfg(feature = "winit")]
+    pub fn run_once<T>(&self, location: InstallDir, cb: T)
+    where
+        T: FnOnce(Application) -> ExitCode + 'static,
+    {
+        use winit::{
+            event::Event,
+            event_loop::{ControlFlow, EventLoop},
+        };
+
+        // We don't launch any windows, so we aren't a graphical application.
+        // There should be an item in the dock, but no windows or menubar.
+        let event_loop = EventLoop::new().expect("Failed to create event loop");
+
+        // Relaunch the application as a bundled application.
+        let app = self.bundle(location).unwrap_or_else(|error| {
+            eprintln!("Application relaunch failed: {}", error);
+            // Something seriously wrong happened.  Bail out.
+            std::process::exit(1);
+        });
+
+        // We are now running as a bundled application.
+        assert!(Trampoline::is_bundled());
+
+        let mut params = Some((cb, app));
+        if let Err(err) = event_loop.run(move |event, window_target| {
+            // We will run the user callback once all OS events have been processed, in the
+            // AboutToWait event handler.
+            window_target.set_control_flow(ControlFlow::Wait);
+
+            if event == Event::AboutToWait {
+                if let Some((cb, app)) = params.take() {
+                    // Run the user's callback.
+                    let _ = cb(app);
+                    // Terminate the application.
+                    window_target.exit();
+                }
+            }
+        }) {
+            eprintln!("Event loop terminated with error: {}", err);
+        };
+    }
 }
 
 /// The application, including pointers to the `[NSBundle mainBundle]` and
@@ -143,33 +186,6 @@ impl Application {
             bundle,
             app,
         }
-    }
-
-    #[cfg(feature = "winit")]
-    pub fn run_once<T>(&self, cb: T)
-    where
-        T: FnOnce() -> ExitCode + 'static,
-    {
-        let mut cb = Some(cb);
-        // We don't launch any windows, so we aren't a graphical application.
-        // There should be an item in the dock, but no windows or menubar.
-        let event_loop = winit::event_loop::EventLoop::new();
-        event_loop.run(move |event, _, control_flow| {
-            *control_flow = winit::event_loop::ControlFlow::Wait;
-
-            #[allow(clippy::single_match)]
-            match event {
-                winit::event::Event::MainEventsCleared => {
-                    if let Some(cb) = cb.take() {
-                        // Run the user's callback.
-                        let _ = cb();
-                        // Terminate the application.
-                        *control_flow = winit::event_loop::ControlFlow::ExitWithCode(0);
-                    }
-                }
-                _ => (),
-            }
-        });
     }
 }
 
