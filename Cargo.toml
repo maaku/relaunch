@@ -15,7 +15,9 @@ readme = "README.md"
 
 [dependencies]
 dirs = "5"
-objc = "0.2.7"
+objc2 = "0.5.2"
+objc2-app-kit = { version = "0.2.2", features = ["NSApplication", "NSResponder"] }
+objc2-foundation = { version = "0.2.2", features = ["NSBundle", "NSString", "NSThread"] }
 
 [dev-dependencies]
 winit = "0.28.2"

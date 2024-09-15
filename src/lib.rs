@@ -11,9 +11,9 @@ use std::io::Error as IOError;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-#[macro_use]
-extern crate objc;
-use objc::runtime::Object;
+use objc2::rc::Retained;
+use objc2_app_kit::NSApplication;
+use objc2_foundation::{MainThreadMarker, NSBundle};
 
 // The relaunch crate is only needed on the macOS platform, but gating
 // dependencies by build configuration is not something that comes naturally
@@ -88,27 +88,17 @@ impl Trampoline {
 
     /// Get a reference to the NSBundle class, which we will use to query if
     /// our process is running as an app bundle.
-    fn get_bundle() -> Option<*mut Object> {
+    fn get_bundle() -> Option<Retained<NSBundle>> {
+        // Get a reference to the main bundle.  This can fail (return nil)
+        // if we are not running as an app bundle, but it is not
+        // guaranteed.
+        let bundle = NSBundle::mainBundle();
         unsafe {
-            // First get a reference to the NSBundle class, which we will use
-            // to query if our process is running as an app bundle.
-            let cls = class!(NSBundle);
-            // Get a reference to the main bundle.  This can fail (return nil)
-            // if we are not running as an app bundle, but it is not
-            // guaranteed.
-            let bundle: *mut Object = msg_send![cls, mainBundle];
-            if bundle.is_null() {
-                return None;
-            }
             // Get a NSString copy of the CFBundleIdentifier key from the
             // bundle's Info.plist.  This for sure will only work if we are
             // running from within a properly configured application bundle.
-            let bundleid: *mut Object = msg_send![bundle, bundleIdentifier];
-            if bundleid.is_null() {
-                return None;
-            }
-            // If we got this far, we are running as an app bundle.
-            Some(bundle)
+            // Otherwise, return None.
+            bundle.bundleIdentifier().and_then(|_| Some(bundle))
         }
     }
     /// Checks if the running process is an applicaiton bundle.
@@ -223,14 +213,14 @@ pub struct Application {
     pub bundle_path: PathBuf,
     /// A reference to the `[NSBundle mainBundle]` instance for the app
     /// bundle.
-    pub bundle: *mut Object,
+    pub bundle: Retained<NSBundle>,
     /// A reference to the `[NSApplication sharedApplication]` instance for
     /// the application.
-    pub app: *mut Object,
+    pub app: Retained<NSApplication>,
 }
 
 impl Application {
-    fn new(name: String, ident: String, bundle: *mut Object) -> Self {
+    fn new(name: String, ident: String, bundle: Retained<NSBundle>) -> Self {
         // Get the path to app bundle from which we are running.
         let mut bundle_path =
             std::env::current_exe().expect("Could not determine path to current executable.");
@@ -238,21 +228,12 @@ impl Application {
         bundle_path.pop(); // MacOS
         bundle_path.pop(); // Contents
 
-        // Make sure the passed-in bundle pointer is valid.
-        debug_assert!(!bundle.is_null());
+        // Establish that we are running on the main thread.
+        let mtm =
+            MainThreadMarker::new().expect("Must call Application::new() from the main thread.");
 
         // Get a reference to the shared application instance.
-        let app: *mut Object = unsafe {
-            // Get a reference to the shared application instance.
-            let cls = class!(NSApplication);
-            let app: *mut Object = msg_send![cls, sharedApplication];
-            // We should always be able to get a copy of sharedApplication,
-            // but just in case...
-            if app.is_null() {
-                panic!("Could not get reference to shared NSApplication.");
-            }
-            app
-        };
+        let app = NSApplication::sharedApplication(mtm);
 
         // Return the new Application instance.
         Self {
