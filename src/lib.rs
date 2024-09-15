@@ -169,6 +169,12 @@ impl Trampoline {
         write!(&mut f, "\t<string>{}</string>\n", self.ident)?;
         write!(&mut f, "\t<key>CFBundleExecutable</key>\n")?;
         write!(&mut f, "\t<string>{}</string>\n", exe_name)?;
+        write!(&mut f, "\t<key>CFBundleShortVersionString</key>\n")?;
+        write!(&mut f, "\t<string>{}</string>\n", self.version)?;
+        write!(&mut f, "\t<key>CFBundleSupportedPlatforms</key>\n")?;
+        write!(&mut f, "\t<array>\n")?;
+        write!(&mut f, "\t\t<string>MacOSX</string>\n")?;
+        write!(&mut f, "\t</array>\n")?;
         write!(&mut f, "\t<key>CFBundleVersion</key>\n")?;
         write!(&mut f, "\t<string>{}</string>\n", self.version)?;
         write!(&mut f, "\t<key>NSPrincipalClass</key>\n")?;
