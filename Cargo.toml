@@ -16,13 +16,18 @@ readme = "README.md"
 [dependencies]
 dirs = "5"
 
+[dev-dependencies]
+winit = "0.28.2"
+
+# macOS platform support
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.2"
 objc2-app-kit = { version = "0.2.2", features = ["NSApplication", "NSResponder"] }
 objc2-foundation = { version = "0.2.2", features = ["NSBundle", "NSString", "NSThread"] }
 
-[dev-dependencies]
-winit = "0.28.2"
+# Android platform support
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["game-activity"] }
 
 # The cargo test harness runs the tests on a separate thread, whereas we need to be running from the
 # main thread to access the AppKit APIs.
