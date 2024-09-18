@@ -10,8 +10,6 @@
 //! simple test only checks the state prior to bundling, and does not perform
 //! the relaunch step.
 
-use relaunch;
-
 #[test]
 fn simple() {
     // We are assuming that this process is being run from the command line,

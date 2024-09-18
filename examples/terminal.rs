@@ -34,6 +34,8 @@ fn main() {
     let event_loop = winit::event_loop::EventLoop::new();
     event_loop.run(move |event, _, control_flow| {
         *control_flow = winit::event_loop::ControlFlow::Wait;
+
+        #[allow(clippy::single_match)]
         match event {
             winit::event::Event::MainEventsCleared => {
                 // Run the example code.

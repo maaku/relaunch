@@ -84,7 +84,7 @@ impl Trampoline {
             // bundle's Info.plist.  This for sure will only work if we are
             // running from within a properly configured application bundle.
             // Otherwise, return None.
-            bundle.bundleIdentifier().and_then(|_| Some(bundle))
+            bundle.bundleIdentifier().map(|_| bundle)
         }
     }
     /// Checks if the running process is an applicaiton bundle.

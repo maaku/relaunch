@@ -37,6 +37,8 @@ fn main() {
         // to process.  So long as the contents of the window are not changing,
         // we only need to redraw after processing all events.
         *control_flow = winit::event_loop::ControlFlow::Wait;
+
+        #[allow(clippy::collapsible_match, clippy::single_match)]
         match event {
             winit::event::Event::WindowEvent { event, .. } => match event {
                 winit::event::WindowEvent::CloseRequested => {
