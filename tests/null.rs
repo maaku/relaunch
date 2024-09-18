@@ -11,7 +11,7 @@
 //! the relaunch step.
 
 #[test]
-fn simple() {
+fn null() {
     // We are assuming that this process is being run from the command line,
     // e.g. by `cargo test`.  Therefore, we should not be bundled.
     assert!(!relaunch::Trampoline::is_bundled());
