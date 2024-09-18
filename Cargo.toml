@@ -27,7 +27,7 @@ objc2-foundation = { version = "0.2.2", features = ["NSBundle", "NSString", "NST
 
 # Android platform support
 [target.'cfg(target_os = "android")'.dependencies]
-android-activity = { version = "0.6", features = ["game-activity"] }
+android-activity = { version = "0.4.3", features = ["game-activity"] }
 
 # The cargo test harness runs the tests on a separate thread, whereas we need to be running from the
 # main thread to access the AppKit APIs.
