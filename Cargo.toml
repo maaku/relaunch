@@ -24,6 +24,8 @@ objc2-foundation = { version = "0.2.2", features = ["NSBundle", "NSString", "NST
 [dev-dependencies]
 winit = "0.28.2"
 
+# The cargo test harness runs the tests on a separate thread, whereas we need to be running from the
+# main thread to access the AppKit APIs.
 [[test]]
 name = "simple"
 harness = false
