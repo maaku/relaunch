@@ -1,4 +1,5 @@
 # relaunch
+
 ![GitHub Actions](https://github.com/maaku/relaunch/actions/workflows/ci.yml/badge.svg)
 
 Relaunch is a library crate for bundling and relaunching macOS applications, in order to access OS features that are only available to app bundles and not command-line applications.
