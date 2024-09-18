@@ -7,8 +7,7 @@
 //! order to access OS features that are only available to app bundles and not
 //! command-line applications.
 
-use std::io::Error as IOError;
-use std::path::PathBuf;
+use std::{io::Error as IOError, path::PathBuf, process::ExitCode};
 
 mod platform_impl;
 use platform_impl::{MainThreadMarker, NSApplication, NSBundle, Retained};
@@ -144,6 +143,33 @@ impl Application {
             bundle,
             app,
         }
+    }
+
+    #[cfg(feature = "winit")]
+    pub fn run_once<T>(&self, cb: T)
+    where
+        T: FnOnce() -> ExitCode + 'static,
+    {
+        let mut cb = Some(cb);
+        // We don't launch any windows, so we aren't a graphical application.
+        // There should be an item in the dock, but no windows or menubar.
+        let event_loop = winit::event_loop::EventLoop::new();
+        event_loop.run(move |event, _, control_flow| {
+            *control_flow = winit::event_loop::ControlFlow::Wait;
+
+            #[allow(clippy::single_match)]
+            match event {
+                winit::event::Event::MainEventsCleared => {
+                    if let Some(cb) = cb.take() {
+                        // Run the user's callback.
+                        let _ = cb();
+                        // Terminate the application.
+                        *control_flow = winit::event_loop::ControlFlow::ExitWithCode(0);
+                    }
+                }
+                _ => (),
+            }
+        });
     }
 }
 
