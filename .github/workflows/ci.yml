@@ -17,7 +17,7 @@ jobs:
           - os_name: Web Assembly
             slug: wasm-webgl2
             # Use macOS so we can test on Safari.
-            os: macos-15
+            os: macos-14
             target: wasm32-unknown-unknown
             run_tests: false
           - os_name: Android ARMv8-A
@@ -32,13 +32,13 @@ jobs:
             run_tests: true
           - os_name: iOS A7+
             slug: ios-a7
-            os: macos-15
+            os: macos-14
             target: aarch64-apple-ios
             # iOS needs a custom test runner.
             run_tests: false
           - os_name: macOS Apple Silicon
             slug: macos-apple-silicon
-            os: macos-15
+            os: macos-14
             target: aarch64-apple-darwin
             run_tests: true
           - os_name: macOS Intel
