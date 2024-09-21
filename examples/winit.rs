@@ -6,9 +6,85 @@
 extern crate relaunch;
 
 use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    application::ApplicationHandler,
+    dpi::{LogicalSize, Size},
+    event::{StartCause, WindowEvent},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    window::{Window, WindowAttributes, WindowId},
 };
+
+struct App {
+    window: Option<Window>,
+}
+
+impl App {
+    fn new() -> Self {
+        App { window: None }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: winit::event::StartCause) {
+        if cause == StartCause::Init {
+            // Application initialization code
+            //...
+
+            // Create the window.
+            self.window = Some(
+                event_loop
+                    .create_window(
+                        WindowAttributes::default()
+                            .with_title("re-winit")
+                            .with_inner_size(Size::Logical(LogicalSize::new(800.0, 600.0))),
+                    )
+                    .expect("Failed to create window"),
+            );
+
+            // ControlFlow::Wait pauses the event loop if no events are available
+            // to process.  So long as the contents of the window are not changing,
+            // we only need to redraw after processing all events.
+            event_loop.set_control_flow(ControlFlow::Wait);
+        }
+    }
+
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let _ = event_loop; // unused
+
+        // Application update code
+        let redraw_required = false;
+        //...
+
+        // Queue a RedrawRequested event if the window contents have changed.
+        if redraw_required {
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let _ = window_id; // unused
+        match event {
+            WindowEvent::RedrawRequested => {
+                // Redraw the application.
+                //...
+            }
+
+            WindowEvent::CloseRequested => {
+                // Terminate the application.
+                event_loop.exit();
+            }
+
+            // Ignore all other `WindowEvent`'s.
+            _ => (),
+        }
+    }
+}
 
 fn main() {
     // First create the winit event loop.  This *must* come before calling out to relaunch.
@@ -34,50 +110,9 @@ fn main() {
     // We are now running as a bundled application.
     assert!(relaunch::Trampoline::is_bundled());
 
-    // Create the window.
-    let window = winit::window::WindowBuilder::new()
-        .with_title("re-winit")
-        .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
-        .build(&event_loop)
-        .expect("Failed to create window");
-
     // Run the event loop.
-    if let Err(err) = event_loop.run(move |event, window_target| {
-        // ControlFlow::Wait pauses the event loop if no events are available
-        // to process.  So long as the contents of the window are not changing,
-        // we only need to redraw after processing all events.
-        window_target.set_control_flow(ControlFlow::Wait);
-
-        #[allow(clippy::collapsible_match, clippy::single_match)]
-        match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::RedrawRequested => {
-                    // Redraw the application.
-                    //...
-                }
-
-                WindowEvent::CloseRequested => {
-                    // Terminate the application.
-                    window_target.exit();
-                }
-
-                // Ignore all other `WindowEvent`'s.
-                _ => (),
-            },
-            Event::AboutToWait => {
-                // Application update code
-                let redraw_required = false;
-                //...
-
-                // Queue a RedrawRequested event if the window contents have
-                // changed.
-                if redraw_required {
-                    window.request_redraw();
-                }
-            }
-            _ => (),
-        }
-    }) {
+    let mut app = App::new();
+    if let Err(err) = event_loop.run_app(&mut app) {
         eprintln!("Event loop terminated with error: {}", err);
     };
 }

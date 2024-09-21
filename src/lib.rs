@@ -98,42 +98,65 @@ impl Trampoline {
     #[cfg(feature = "winit")]
     pub fn run_once<T>(&self, location: InstallDir, cb: T)
     where
-        T: FnOnce(Application) -> ExitCode + 'static,
+        T: FnOnce(&Application) -> ExitCode + 'static,
     {
         use winit::{
-            event::Event,
-            event_loop::{ControlFlow, EventLoop},
+            application::ApplicationHandler,
+            event::WindowEvent,
+            event_loop::{ActiveEventLoop, EventLoop},
+            window::WindowId,
         };
+
+        #[allow(clippy::type_complexity)]
+        struct WinitApp {
+            relaunch_app: Application,
+            cb: Option<Box<dyn FnOnce(&Application) -> ExitCode + 'static>>,
+        }
+        impl ApplicationHandler for WinitApp {
+            fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+                // Required to be implemented, but we don't need to do anything.
+                let _ = event_loop;
+            }
+
+            fn window_event(
+                &mut self,
+                event_loop: &ActiveEventLoop,
+                window_id: WindowId,
+                event: WindowEvent,
+            ) {
+                // Required to be implemented, but we don't need to do anything.
+                let _ = (event_loop, window_id, event);
+            }
+
+            // We will run the user callback once all OS events have been processed, in the
+            // about_to_wait event handler.
+            fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+                if let Some(cb) = self.cb.take() {
+                    // Run the user's callback.
+                    let _ = cb(&self.relaunch_app);
+                    // Terminate the application.
+                    event_loop.exit();
+                }
+            }
+        }
 
         // We don't launch any windows, so we aren't a graphical application.
         // There should be an item in the dock, but no windows or menubar.
         let event_loop = EventLoop::new().expect("Failed to create event loop");
 
         // Relaunch the application as a bundled application.
-        let app = self.bundle(location).unwrap_or_else(|error| {
+        let relaunch_app = self.bundle(location).unwrap_or_else(|error| {
             eprintln!("Application relaunch failed: {}", error);
             // Something seriously wrong happened.  Bail out.
             std::process::exit(1);
         });
 
-        // We are now running as a bundled application.
-        assert!(Trampoline::is_bundled());
+        let mut winit_app = WinitApp {
+            relaunch_app,
+            cb: Some(Box::new(cb)),
+        };
 
-        let mut params = Some((cb, app));
-        if let Err(err) = event_loop.run(move |event, window_target| {
-            // We will run the user callback once all OS events have been processed, in the
-            // AboutToWait event handler.
-            window_target.set_control_flow(ControlFlow::Wait);
-
-            if event == Event::AboutToWait {
-                if let Some((cb, app)) = params.take() {
-                    // Run the user's callback.
-                    let _ = cb(app);
-                    // Terminate the application.
-                    window_target.exit();
-                }
-            }
-        }) {
+        if let Err(err) = event_loop.run_app(&mut winit_app) {
             eprintln!("Event loop terminated with error: {}", err);
         };
     }
