@@ -53,3 +53,7 @@ required-features = ["winit"]
 [[test]]
 name = "simple"
 harness = false
+
+[[test]]
+name = "lifecycle"
+harness = false
