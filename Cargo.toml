@@ -22,9 +22,11 @@ winit = { version = "0.30", optional = true}
 
 # macOS platform support
 [target.'cfg(target_os = "macos")'.dependencies]
+nix = { version = "0.31", features = ["signal"] }
 objc2 = "0.5.2"
 objc2-app-kit = { version = "0.2.2", features = ["NSApplication", "NSResponder"] }
 objc2-foundation = { version = "0.2.2", features = ["NSBundle", "NSString", "NSThread"] }
+signal-hook = "0.4"
 
 # Android platform support
 [target.'cfg(target_os = "android")'.dependencies]

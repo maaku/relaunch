@@ -40,13 +40,10 @@ impl NSBundle {
     pub fn mainBundle() -> Retained<Self> {
         Retained(Self)
     }
-    pub unsafe fn bundleIdentifier(&self) -> Option<String> {
-        if IS_BUNDLED.load(Ordering::Relaxed) {
-            Some("org.example.MyApp".to_string())
-        } else {
-            None
-        }
-    }
+}
+
+pub fn has_bundle_identifier(_bundle: &NSBundle) -> bool {
+    IS_BUNDLED.load(Ordering::Relaxed)
 }
 
 #[derive(Copy, Clone)]

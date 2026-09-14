@@ -10,13 +10,15 @@
 use std::{io::Error as IOError, path::PathBuf, process::ExitCode};
 
 mod platform_impl;
-use platform_impl::{MainThreadMarker, NSApplication, NSBundle, Retained};
+use platform_impl::{has_bundle_identifier, MainThreadMarker, NSApplication, NSBundle, Retained};
 
 extern crate dirs;
 
 /// Where to save the generated app bundle.
 pub enum InstallDir {
-    /// Save the app bundle in a system-defined temporary directory.
+    /// Save the app bundle in a new directory of its own within
+    /// `~/Library/Caches/<bundle identifier>`, which is removed when the
+    /// application exits.
     Temp,
     /// Save the app bundle in the system-wide `Applications` directory.
     SystemApplications,
@@ -78,13 +80,10 @@ impl Trampoline {
         // if we are not running as an app bundle, but it is not
         // guaranteed.
         let bundle = NSBundle::mainBundle();
-        unsafe {
-            // Get a NSString copy of the CFBundleIdentifier key from the
-            // bundle's Info.plist.  This for sure will only work if we are
-            // running from within a properly configured application bundle.
-            // Otherwise, return None.
-            bundle.bundleIdentifier().map(|_| bundle)
-        }
+        // The CFBundleIdentifier key of the bundle's Info.plist is for sure
+        // only present if we are running from within a properly configured
+        // application bundle.  Otherwise, return None.
+        has_bundle_identifier(&bundle).then_some(bundle)
     }
     /// Checks if the running process is an applicaiton bundle.
     pub fn is_bundled() -> bool {

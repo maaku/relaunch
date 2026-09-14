@@ -4,14 +4,27 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::{Application, InstallDir, Trampoline};
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
+use signal_hook::{
+    consts::{SIGHUP, SIGINT, SIGQUIT, SIGTERM},
+    iterator::Signals,
+};
 use std::{
-    io::{Error as IOError, Write},
+    collections::hash_map::RandomState,
+    hash::{BuildHasher, Hasher},
+    io::{Error as IOError, ErrorKind, Write},
     path::{Path, PathBuf},
+    process::ExitStatus,
 };
 
 pub use objc2::rc::Retained;
 pub use objc2_app_kit::NSApplication;
 pub use objc2_foundation::{MainThreadMarker, NSBundle};
+
+use objc2_foundation::ns_string;
 
 // The relaunch crate is only needed on the macOS platform, but gating
 // dependencies by build configuration is not something that comes naturally
@@ -25,6 +38,13 @@ extern "C" {}
 #[link(name = "Foundation", kind = "framework")] // For NSBundle
 extern "C" {}
 
+/// Checks whether the bundle's Info.plist provides a bundle identifier.
+pub fn has_bundle_identifier(bundle: &NSBundle) -> bool {
+    bundle
+        .infoDictionary()
+        .is_some_and(|info| info.get(ns_string!("CFBundleIdentifier")).is_some())
+}
+
 pub fn bundle(trampoline: &Trampoline, location: InstallDir) -> Result<Application, IOError> {
     if let Some(bundle) = Trampoline::get_bundle() {
         return Ok(Application::new(
@@ -34,12 +54,61 @@ pub fn bundle(trampoline: &Trampoline, location: InstallDir) -> Result<Applicati
         ));
     }
 
-    let install_path = match location {
-        InstallDir::Temp => std::env::temp_dir(),
-        InstallDir::SystemApplications => PathBuf::from("/Applications"),
-        InstallDir::UserApplications => dirs::home_dir().unwrap().join("Applications"),
-        InstallDir::Custom(path) => std::fs::canonicalize(path)?,
+    // Disposable bundles each get a directory of their own, so that multiple
+    // instances do not interfere with one another, which is removed once the
+    // application exits.
+    let (install_path, disposable) = match location {
+        InstallDir::Temp => {
+            let parent = dirs::cache_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join(&trampoline.ident);
+            (create_unique_dir(&parent)?, Some(parent))
+        }
+        InstallDir::SystemApplications => (PathBuf::from("/Applications"), None),
+        InstallDir::UserApplications => (dirs::home_dir().unwrap().join("Applications"), None),
+        InstallDir::Custom(path) => (std::fs::canonicalize(path)?, None),
     };
+
+    let status = launch(trampoline, &install_path);
+    if let Some(parent) = disposable {
+        let _ = std::fs::remove_dir_all(&install_path);
+        // Only succeeds if no other instance is still using it.
+        let _ = std::fs::remove_dir(&parent);
+    }
+
+    match status?.code() {
+        // If the app exited with exit code, return that code.
+        Some(code) => std::process::exit(code),
+        // Otherwise the app was terminated by a signal.  We should find
+        // some way to propagate that signal, but for now we just exit
+        // with code 125 (the highest user-defined POSIX exit code) to
+        // indicate an error.
+        None => std::process::exit(125),
+    }
+}
+
+/// Creates a new, empty directory within `parent`, named after this process
+/// and a random nonce.
+fn create_unique_dir(parent: &Path) -> Result<PathBuf, IOError> {
+    let pid = std::process::id();
+    loop {
+        std::fs::create_dir_all(parent)?;
+        let nonce = RandomState::new().build_hasher().finish();
+        let dir = parent.join(format!("{pid}-{nonce:016x}"));
+        match std::fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir),
+            // The name is already taken, or the parent directory was removed
+            // by an exiting instance in the meantime.
+            Err(error)
+                if matches!(error.kind(), ErrorKind::AlreadyExists | ErrorKind::NotFound) => {}
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+/// Builds the app bundle within `install_path`, then runs it and waits for it
+/// to exit.
+fn launch(trampoline: &Trampoline, install_path: &Path) -> Result<ExitStatus, IOError> {
     let bundle_path = install_path.join(format!("{}.app", trampoline.name));
     let contents_path = Path::new(&bundle_path).join("Contents");
     let macos_path = contents_path.clone().join("MacOS");
@@ -102,16 +171,28 @@ pub fn bundle(trampoline: &Trampoline, location: InstallDir) -> Result<Applicati
     writeln!(&mut f, "</plist>")?;
 
     // Launch newly created bundle
-    let status = std::process::Command::new(dst_exe).spawn()?.wait()?;
-    match status.code() {
-        // If the app exited with exit code, return that code.
-        Some(code) => std::process::exit(code),
-        // Otherwise the app was terminated by a signal.  We should find
-        // some way to propagate that signal, but for now we just exit
-        // with code 125 (the highest user-defined POSIX exit code) to
-        // indicate an error.
-        None => std::process::exit(125),
-    }
+    let signals = Signals::new([SIGHUP, SIGINT, SIGQUIT, SIGTERM])?;
+    let mut child = std::process::Command::new(dst_exe).spawn()?;
+    relay_signals(signals, Pid::from_raw(child.id() as i32));
+    child.wait()
+}
+
+/// Handles the signals caught by `signals` on behalf of the relaunched
+/// application at `pid`, including any caught before it was started.
+///
+/// Catching these signals keeps the trampoline alive until the application
+/// exits, so that it can clean up after it.  Signals generated by the terminal
+/// are delivered to the application directly, as it is in the same process
+/// group, so only termination requests need to be relayed.  Unlike ignored
+/// signals, caught signals revert to their default action in the application.
+fn relay_signals(mut signals: Signals, pid: Pid) {
+    std::thread::spawn(move || {
+        for signal in signals.forever() {
+            if signal == SIGTERM {
+                let _ = kill(pid, Signal::SIGTERM);
+            }
+        }
+    });
 }
 
 // End of File

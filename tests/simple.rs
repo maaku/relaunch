@@ -6,7 +6,7 @@
 use std::io::Error as IOError;
 
 fn main() -> Result<(), IOError> {
-    // Bundle and relaunch the application in a temporary directory.
+    // Bundle and relaunch the application in a disposable per-user directory.
     let _app =
         relaunch::Trampoline::new("re-Test-Simple", "com.github.maaku.relauncher.tests.Simple")
             .bundle(relaunch::InstallDir::Temp)?;
