@@ -924,7 +924,7 @@ dependencies = [
 
 [[package]]
 name = "relaunch"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "android-activity",
  "dirs",
